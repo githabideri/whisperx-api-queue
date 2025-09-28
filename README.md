@@ -93,4 +93,4 @@ journalctl -u whisperx-worker-queue -f
 - **Tailscale**: For tailnet-only exposure, bind API to `127.0.0.1` and run `tailscale serve http / http://127.0.0.1:7860`.
 
 ## License
-MIT
+GPL-3.0 license
