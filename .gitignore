@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.venv
+venv/
+whenv/
+.env.local
+.DS_Store
+.s3cfg
+*.swp
+*.swo
+/srv/whisperx/

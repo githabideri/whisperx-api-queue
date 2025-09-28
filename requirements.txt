@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+redis>=5.0
+rq>=1.12
+python-multipart>=0.0.9
+# whisperx + torch/torchaudio are expected to be installed separately (GPU build)
