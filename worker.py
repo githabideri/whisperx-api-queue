@@ -79,7 +79,11 @@ def run_whisperx_job(job_id: str, audio_path: str, language: str | None,
             "model": os.getenv("WHISPER_MODEL", "large-v3"),
         }
 
-        options = {}
+        options = {
+            "max_line_width": None,
+            "max_line_count": None,
+            "highlight_words": False
+        }
 
         if return_srt:
             srt_path = workdir / "result.srt"
