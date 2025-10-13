@@ -79,26 +79,28 @@ def run_whisperx_job(job_id: str, audio_path: str, language: str | None,
             "model": os.getenv("WHISPER_MODEL", "large-v3"),
         }
 
+        options = {}
+
         if return_srt:
             srt_path = workdir / "result.srt"
             writer = WriteSRT(str(workdir))
-            writer(aligned, str(srt_path))
+            writer(aligned, str(srt_path), options)
             payload["srt"] = srt_path.read_text(encoding="utf-8")
 
         if return_vtt:
             vtt_path = workdir / "result.vtt"
             writer = WriteVTT(str(workdir))
-            writer(aligned, str(vtt_path))
+            writer(aligned, str(vtt_path), options)
 
         if return_tsv:
             tsv_path = workdir / "result.tsv"
             writer = WriteTSV(str(workdir))
-            writer(aligned, str(tsv_path))
+            writer(aligned, str(tsv_path), options)
 
         if return_txt:
             txt_path = workdir / "result.txt"
             writer = WriteTXT(str(workdir))
-            writer(aligned, str(txt_path))
+            writer(aligned, str(txt_path), options)
 
         (workdir / "result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         payload["duration_ms"] = int((time.time() - started) * 1000)
