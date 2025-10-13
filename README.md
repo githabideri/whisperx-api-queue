@@ -2,7 +2,7 @@ Welcome to this small project of mine, I wanted a small API server that specific
 Will be improved over time, don't expect miracles, I am not a programmer. This project was mainly written by GPT-5 (in its different variants) and only composed/conducted/slopped together by me.
 Might have security issues, so don't expose over the internet and always be careful what you download over the internet.
 
-# whisperx-api-queue (v0.1.1)
+# whisperx-api-queue (v0.1.2)
 
 Queue-based HTTP API for [WhisperX](https://github.com/m-bain/whisperX) with internal GPU exclusivity via a Redis lock.
 Built for single-GPU hosts (LXC ok) with optional Tailscale exposure.
@@ -80,9 +80,10 @@ journalctl -u whisperx-worker-queue -f
 
 ## Endpoints
 - `POST /submit` → `{ job_id, state }`
-  - form fields: `file`, `language?`, `diarize?`, `batch_size?`, `return_srt?`
+  - form fields: `file`, `language?`, `diarize?`, `batch_size?`, `return_srt?`, `return_vtt?`, `return_tsv?`, `return_txt?`
 - `GET /status/{job_id}` → `{ job_id, state, error? }`
 - `GET /result/{job_id}` → `{ segments[], language, model, diarized, srt? }`
+- `GET /download/{job_id}/{filename}` → file download (e.g. `result.json`, `result.srt`)
 - `GET /healthz` → `{ ok: true }`
 
 ## Notes

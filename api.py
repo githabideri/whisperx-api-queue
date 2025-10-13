@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, Form, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from rq.job import Job
 
 # Retry import compatible with multiple RQ versions
@@ -30,6 +30,9 @@ async def submit(
     diarize: bool = Form(False),
     batch_size: int = Form(16),
     return_srt: bool = Form(False),
+    return_vtt: bool = Form(False),
+    return_tsv: bool = Form(False),
+    return_txt: bool = Form(False),
     x_api_key: str | None = Header(default=None),
 ):
     require_api_key(x_api_key)
@@ -49,6 +52,9 @@ async def submit(
         diarize=diarize,
         batch_size=batch_size,
         return_srt=return_srt,
+        return_vtt=return_vtt,
+        return_tsv=return_tsv,
+        return_txt=return_txt,
     )
     enqueue_kwargs = dict(
         kwargs=kwargs,
@@ -86,6 +92,15 @@ def result(job_id: str, x_api_key: str | None = Header(default=None)):
     if job.get_status() != "finished":
         raise HTTPException(409, "not ready")
     return JSONResponse(job.result)
+
+@app.get("/download/{job_id}/{filename}")
+def download(job_id: str, filename: str, x_api_key: str | None = Header(default=None)):
+    require_api_key(x_api_key)
+    workdir = DATA_ROOT / job_id
+    path = workdir / filename
+    if not path.is_file():
+        raise HTTPException(404, f"file not found: {filename}")
+    return FileResponse(path)
 
 @app.get("/healthz")
 def healthz():

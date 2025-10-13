@@ -5,34 +5,10 @@ from contextlib import contextmanager
 import torch
 import whisperx
 import redis
+from whisperx.utils import WriteVTT, WriteTSV, WriteTXT, WriteSRT
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 r = redis.from_url(REDIS_URL)
-
-# -------- SRT helper --------
-def _fmt_ts(sec: float) -> str:
-    if sec is None:
-        sec = 0.0
-    if sec < 0:
-        sec = 0.0
-    ms_total = int(round(sec * 1000))
-    h = ms_total // 3_600_000
-    m = (ms_total % 3_600_000) // 60_000
-    s = (ms_total % 60_000) // 1000
-    ms = ms_total % 1000
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
-def write_srt(segments, path: str):
-    lines = []
-    for i, seg in enumerate(segments, 1):
-        start = _fmt_ts(seg.get("start"))
-        end = _fmt_ts(seg.get("end"))
-        text = (seg.get("text") or "").strip()
-        lines.append(str(i))
-        lines.append(f"{start} --> {end}")
-        lines.append(text if text else "")
-        lines.append("")  # blank line
-    Path(path).write_text("\n".join(lines), encoding="utf-8")
 
 # -------- GPU exclusivity lock --------
 GPU_LOCK_KEY = os.getenv("GPU_LOCK_KEY", "whisperx:gpu:lock")
@@ -74,7 +50,7 @@ def _lazy_models(language: str | None, diarize: bool):
     return _model, _align_model, _align_meta, _diarizer
 
 def run_whisperx_job(job_id: str, audio_path: str, language: str | None,
-                     diarize: bool, batch_size: int, return_srt: bool):
+                     diarize: bool, batch_size: int, return_srt: bool, return_vtt: bool, return_tsv: bool, return_txt: bool):
     from rq import get_current_job
     job = get_current_job()
     started = time.time()
@@ -105,8 +81,24 @@ def run_whisperx_job(job_id: str, audio_path: str, language: str | None,
 
         if return_srt:
             srt_path = workdir / "result.srt"
-            write_srt(aligned["segments"], str(srt_path))
+            writer = WriteSRT(str(workdir))
+            writer(aligned, str(srt_path))
             payload["srt"] = srt_path.read_text(encoding="utf-8")
+
+        if return_vtt:
+            vtt_path = workdir / "result.vtt"
+            writer = WriteVTT(str(workdir))
+            writer(aligned, str(vtt_path))
+
+        if return_tsv:
+            tsv_path = workdir / "result.tsv"
+            writer = WriteTSV(str(workdir))
+            writer(aligned, str(tsv_path))
+
+        if return_txt:
+            txt_path = workdir / "result.txt"
+            writer = WriteTXT(str(workdir))
+            writer(aligned, str(txt_path))
 
         (workdir / "result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         payload["duration_ms"] = int((time.time() - started) * 1000)
