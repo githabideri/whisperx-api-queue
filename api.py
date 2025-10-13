@@ -18,10 +18,16 @@ except Exception:
 
 from common import q, redis_conn, require_api_key
 
+VERSION_FILE = Path(__file__).resolve().parent / "VERSION"
+try:
+    APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+except FileNotFoundError:
+    APP_VERSION = "0.1.2"
+
 DATA_ROOT = Path(os.getenv("DATA_ROOT", "/srv/whisperx")).resolve()
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="WhisperX Queue API", version="0.1.1")
+app = FastAPI(title="WhisperX Queue API", version=APP_VERSION)
 
 @app.post("/submit")
 async def submit(
