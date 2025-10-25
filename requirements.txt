@@ -3,4 +3,6 @@ uvicorn[standard]>=0.30
 redis>=5.0
 rq>=1.12
 python-multipart>=0.0.9
+pydantic-settings>=2.2
+pytest>=8.3
 # whisperx + torch/torchaudio are expected to be installed separately (GPU build)

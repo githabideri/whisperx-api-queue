@@ -2,24 +2,28 @@ Welcome to this small project of mine, I wanted a small API server that specific
 Will be improved over time, don't expect miracles, I am not a programmer. This project was mainly written by GPT-5 (in its different variants) and only composed/conducted/slopped together by me.
 Might have security issues, so don't expose over the internet and always be careful what you download over the internet.
 
-# whisperx-api-queue (v0.1.2)
+# whisperx-api-queue (v0.2.1)
+
+![version](https://img.shields.io/badge/version-0.2.1-blue.svg)
+![license](https://img.shields.io/badge/license-GPLv3-blue.svg)
 
 Queue-based HTTP API for [WhisperX](https://github.com/m-bain/whisperX) with internal GPU exclusivity via a Redis lock.
 Built for single-GPU hosts (LXC ok) with optional Tailscale exposure.
 
 ## Features
-- FastAPI HTTP surface: `/submit`, `/status/{job_id}`, `/result/{job_id}`, `/healthz`
+- OpenAI-compatible surfaces: `POST /v1/audio/transcriptions` and `POST /v1/audio/translations`
+- Legacy queue surface: `/submit`, `/status/{job_id}`, `/result/{job_id}`, `/download/{job_id}/{filename}`, `/healthz`
 - RQ/Redis job queue (no request timeouts on long media)
 - Single-GPU exclusivity (Redis lock) so only one WhisperX job runs at a time
-- Persistent artifacts per job (`/srv/whisperx/<job_id>/result.json`, `result.srt`)
+- Persistent artifacts per job (`/srv/whisperx/<job_id>/result.json`, `result.srt`, etc.)
+- Config driven by Pydantic settings (`Config`), including model preload, quantization, API key policy
 - Minimal deps; WhisperX + Torch are assumed installed in your venv
-- Model configurable via env (`WHISPER_MODEL`, default **large-v3**)
 
 ## Requirements
 - Ubuntu 24.04 LXC (or any Linux host)
 - Redis server (apt `redis-server`)
 - Python 3.10+ virtualenv with: torch/torchaudio (CUDA), whisperx
-- This repo deps: `fastapi`, `uvicorn[standard]`, `redis`, `rq`, `python-multipart`
+- This repo deps: `fastapi`, `uvicorn[standard]`, `redis`, `rq`, `python-multipart`, `pydantic-settings`
 
 ## Quickstart (manual run)
 ```bash
@@ -35,7 +39,18 @@ rq worker whisperx
 # terminal 2: start API on LAN
 uvicorn api:app --host 0.0.0.0 --port 7860 --workers 1
 
-# terminal 3 (client): submit, poll, fetch
+# terminal 3 (client): submit via OpenAI-compatible endpoint
+JOB_ID=$(curl -s -X POST "http://<HOST>:7860/v1/audio/transcriptions" \
+  -H "Authorization: Bearer $API_KEY" \
+  -F file=@/path/to/audio.mp3 \
+  -F model=large-v3 \
+  -F language=en \
+  -F response_format=verbose_json | jq -r .job_id)
+
+curl -s -H "Authorization: Bearer $API_KEY" "http://<HOST>:7860/status/$JOB_ID" | jq
+curl -s -H "Authorization: Bearer $API_KEY" "http://<HOST>:7860/result/$JOB_ID" | jq '.content'
+
+# legacy endpoint still available
 JOB_ID=$(curl -s -X POST "http://<HOST>:7860/submit"   -F file=@/path/to/audio.mp3   -F language=de -F diarize=false -F return_srt=true -F batch_size=8 | jq -r .job_id)
 
 curl -s "http://<HOST>:7860/status/$JOB_ID" | jq
@@ -79,10 +94,14 @@ journalctl -u whisperx-worker-queue -f
 ```
 
 ## Endpoints
+- `POST /v1/audio/transcriptions` → `{ job_id, state, status_url, result_url }`
+  - OpenAI form fields: `file`, `model?`, `language?`, `prompt?`, `response_format?`, `temperature?`, `timestamp_granularities[]?`, `stream?`, `hotwords?`, `suppress_numerals?`, `highlight_words?`, `align?`, `diarize?`, `chunk_size?`
+- `POST /v1/audio/translations` → `{ job_id, state, status_url, result_url }`
+  - OpenAI form fields: `file`, `model?`, `prompt?`, `response_format?`, `temperature?`, `chunk_size?`
 - `POST /submit` → `{ job_id, state }`
   - form fields: `file`, `language?`, `diarize?`, `batch_size?`, `return_srt?`, `return_vtt?`, `return_tsv?`, `return_txt?`
 - `GET /status/{job_id}` → `{ job_id, state, error? }`
-- `GET /result/{job_id}` → `{ segments[], language, model, diarized, srt? }`
+- `GET /result/{job_id}` → job payload (for OpenAI jobs includes `content`, `media_type`, `transcription`)
 - `GET /download/{job_id}/{filename}` → file download (e.g. `result.json`, `result.srt`)
 - `GET /healthz` → `{ ok: true }`
 
@@ -91,7 +110,28 @@ journalctl -u whisperx-worker-queue -f
 - **GPU lock**: Only serializes **this** service; other GPU consumers (e.g., Ollama in another LXC) are not coordinated.
   - Clear stuck lock: `redis-cli DEL whisperx:gpu:lock`
 - **OOM**: Use smaller `batch_size` or switch to `medium` model.
+- **API keys**: `Authorization: Bearer …` _or_ `X-API-Key` works interchangeably. Provide a single `API_KEY`, a JSON map via `API_KEYS_FILE`, or leave both unset for open access (development only). Bearer-only requests now mirror the upstream WhisperX API server and OpenAI’s Audio endpoints.
 - **Tailscale**: For tailnet-only exposure, bind API to `127.0.0.1` and run `tailscale serve http / http://127.0.0.1:7860`.
+
+## Development
+
+### Running the tests
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+The smoke suite verifies that OpenAI-style requests succeed with `Authorization: Bearer …` and fail without credentials.
+
+### Release checklist
+1. Ensure `pytest` passes.
+2. Update `progress.md` or other release notes as needed.
+3. Tag and push the release:
+   ```bash
+   git tag -a v0.2.1 -m "whisperx-api-queue 0.2.1"
+   git push origin main --tags
+   ```
 
 ## License
 GPL-3.0 license
